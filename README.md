@@ -69,5 +69,5 @@ class WithAccessors
 ## Bugs
 
 If you experience compile-time problems, open an
-(issue)[https://github.com/funkwerk/accessors/issues] with the
+[issue](https://github.com/funkwerk/accessors/issues) with the
 information about the type of the member variable fails.
