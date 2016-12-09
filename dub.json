@@ -1,0 +1,16 @@
+{
+	"name": "accessors",
+	"description": "D getter/setter generator",
+	"license": "BSL-1.0",
+	"authors": [
+		"Eugene Wissner"
+	],
+
+	"targetType": "library",
+
+	"configurations": [
+		{
+			"name": "library"
+		}
+	]
+}
