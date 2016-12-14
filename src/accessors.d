@@ -96,13 +96,13 @@ template GenerateReader(string name, alias field)
         {
             enum valueType = typeName!(MutableOf!(ForeachType!(typeof(field))));
 
-            return format("%s final inout(%s)[] %s() inout " ~
+            return format("%s final @property inout(%s)[] %s() inout " ~
                 "{ inout(%s)[] result = null; result ~= this.%s; return result; }",
                 visibility, valueType, accessorName, valueType, name);
         }
         else
         {
-            return format("%s final inout(%s) %s() inout { return this.%s; }",
+            return format("%s final @property inout(%s) %s() inout { return this.%s; }",
                 visibility, outputType, accessorName, name);
         }
     }
@@ -116,11 +116,11 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateReader!("foo", integerValue) ==
-        "public final inout(int) foo() inout { return this.foo; }");
+        "public final @property inout(int) foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", stringValue) ==
-        "public final inout(string) foo() inout { return this.foo; }");
+        "public final @property inout(string) foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final inout(int)[] foo() inout " ~
+        "public final @property inout(int)[] foo() inout " ~
         "{ inout(int)[] result = null; result ~= this.foo; return result; }");
 }
 
@@ -136,7 +136,7 @@ template GenerateRefReader(string name, alias field)
         enum outputType = typeName!(typeof(field));
         enum accessorName = accessor(name);
 
-        return format("%s final ref %s %s() { return this.%s; }",
+        return format("%s final @property ref %s %s() { return this.%s; }",
             visibility, outputType, accessorName, name);
     }
 }
@@ -149,11 +149,11 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateRefReader!("foo", integerValue) ==
-        "public final ref int foo() { return this.foo; }");
+        "public final @property ref int foo() { return this.foo; }");
     static assert(GenerateRefReader!("foo", stringValue) ==
-        "public final ref string foo() { return this.foo; }");
+        "public final @property ref string foo() { return this.foo; }");
     static assert(GenerateRefReader!("foo", intArrayValue) ==
-        "public final ref int[] foo() { return this.foo; }");
+        "public final @property ref int[] foo() { return this.foo; }");
 }
 
 template GenerateConstReader(string name, alias field)
@@ -168,7 +168,7 @@ template GenerateConstReader(string name, alias field)
         enum outputType = typeName!(typeof(field));
         enum accessorName = accessor(name);
 
-        return format("%s final const(%s) %s() const { return this.%s; }",
+        return format("%s final @property const(%s) %s() const { return this.%s; }",
             visibility, outputType, accessorName, name);
     }
 }
@@ -187,7 +187,7 @@ template GenerateWriter(string name, alias field)
         enum inputName = accessorName;
         enum needToDup = needToDup!field;
 
-        return format("%s final void %s(%s %s) { this.%s = %s%s; }",
+        return format("%s final @property void %s(%s %s) { this.%s = %s%s; }",
             visibility, accessorName, inputType, inputName, name, inputName, needToDup ? ".dup" : "");
     }
 }
@@ -200,11 +200,11 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateWriter!("foo", integerValue) ==
-        "public final void foo(int foo) { this.foo = foo; }");
+        "public final @property void foo(int foo) { this.foo = foo; }");
     static assert(GenerateWriter!("foo", stringValue) ==
-        "public final void foo(string foo) { this.foo = foo; }");
+        "public final @property void foo(string foo) { this.foo = foo; }");
     static assert(GenerateWriter!("foo", intArrayValue) ==
-        "public final void foo(int[] foo) { this.foo = foo.dup; }");
+        "public final @property void foo(int[] foo) { this.foo = foo.dup; }");
 }
 
 /**
@@ -556,7 +556,7 @@ unittest
         @RefRead
         private string str_;
 
-        public const(string) str() const
+        public @property const(string) str() const
         {
             return this.str_.dup;
         }
