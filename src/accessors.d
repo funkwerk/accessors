@@ -666,3 +666,26 @@ unittest
         static assert(is(typeof(y) == const(X)[]));
     }
 }
+
+/// Property has correct type.
+unittest
+{
+    class C
+    {
+        @Read
+        private int foo_;
+
+        final inout(int) fooMethod() inout
+        {
+            return foo_;
+        }
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    with (new C)
+    {
+        static assert(is(typeof(foo) == int));
+        static assert(!is(typeof(foo) == typeof(fooMethod)));
+    }
+}
