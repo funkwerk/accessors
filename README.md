@@ -66,6 +66,39 @@ class WithAccessors
 }
 ```
 
+## Example
+
+```d
+import accessors;
+import std.stdio;
+
+class Person
+{
+    @Read @Write
+    private uint age_;
+
+    @ConstRead
+    private string name_;
+
+    this(in string name, in uint age = 0)
+    {
+        this.name_ = name;
+        this.age_ = age;
+    }
+
+    mixin(GenerateFieldAccessors);
+}
+
+void main()
+{
+    auto person = new Person("Saul Kripke");
+
+    person.age = 57;
+
+    writeln(person.name, ": ", person.age);
+}
+```
+
 ## Bugs
 
 If you experience compile-time problems, open an
