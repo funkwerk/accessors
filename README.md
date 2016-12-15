@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/funkwerk/accessors.svg?branch=master)](https://travis-ci.org/funkwerk/accessors)
 [![License](https://img.shields.io/badge/license-BSL_1.0-blue.svg)](https://raw.githubusercontent.com/funkwerk/accessors/master/LICENSE)
+[![Dub Version](https://img.shields.io/dub/v/accessors.svg)](https://code.dlang.org/packages/accessors)
 
 `accessors` module allows to generate getters and setters automatically.
 
