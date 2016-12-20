@@ -408,6 +408,8 @@ unittest
         test = No.someFlag;
 
         assert(test == No.someFlag);
+
+        static assert(is(typeof(test) == Flag!"someFlag"));
     }
 }
 
@@ -428,6 +430,8 @@ unittest
     {
         assert(!test.isNull);
         assert(test.get == "X");
+
+        static assert(is(typeof(test) == Nullable!string));
     }
 }
 
@@ -448,6 +452,9 @@ unittest
     mutableObject.i_ = 42;
 
     assert(mutableObject.i == 42);
+
+    static assert(is(typeof(mutableObject.i) == int));
+    static assert(is(typeof(constObject.i) == const(int)));
 }
 
 /// Creates ref reader.
@@ -466,6 +473,7 @@ unittest
     mutableTestObject.i = 42;
 
     assert(mutableTestObject.i == 42);
+    static assert(is(typeof(mutableTestObject.i) == int));
 }
 
 /// Creates writer.
@@ -484,6 +492,7 @@ unittest
 
     assert(mutableTestObject.i == 42);
     static assert(!__traits(compiles, mutableTestObject.i += 1));
+    static assert(is(typeof(mutableTestObject.i) == int));
 }
 
 /// Checks whether hasUDA can be used for each member.
@@ -540,6 +549,7 @@ unittest
     {
         s = "foo";
         assert(s == "foo");
+        static assert(is(typeof(s) == string));
     }
 }
 
@@ -590,6 +600,7 @@ unittest
         x_ = new X;
 
         assert(x == x_);
+        static assert(is(typeof(x) == X));
     }
 }
 
@@ -615,6 +626,9 @@ unittest
     mutableObject.s_.i = 42;
 
     assert(constObject.s.i == 42);
+
+    static assert(is(typeof(mutableObject.s) == Test.S));
+    static assert(is(typeof(constObject.s) == const(Test.S)));
 }
 
 /// Reader for structs return copies.
@@ -664,6 +678,7 @@ unittest
         auto y = foo;
 
         static assert(is(typeof(y) == const(X)[]));
+        static assert(is(typeof(foo) == const(X)[]));
     }
 }
 
@@ -686,6 +701,5 @@ unittest
     with (new C)
     {
         static assert(is(typeof(foo) == int));
-        static assert(!is(typeof(foo) == typeof(fooMethod)));
     }
 }
