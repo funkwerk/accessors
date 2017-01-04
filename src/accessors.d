@@ -1,4 +1,4 @@
-module accessors;
+module accessors_;
 
 struct Read
 {
@@ -22,7 +22,7 @@ struct Write
 
 immutable string GenerateFieldAccessors = `
     mixin GenerateFieldAccessorMethods;
-    mixin(GenerateFieldAccessorMethods);
+    mixin(GenerateFieldAccessorMethods2);
     `;
 
 mixin template GenerateFieldAccessorMethods()
@@ -31,7 +31,7 @@ mixin template GenerateFieldAccessorMethods()
 
     private enum bool isNotThis(string T) = T != "this";
 
-    static enum GenerateFieldAccessorMethods()
+    static enum GenerateFieldAccessorMethods2()
     {
         import std.traits : hasUDA;
 
@@ -664,5 +664,25 @@ unittest
         auto y = foo;
 
         static assert(is(typeof(y) == const(X)[]));
+    }
+}
+
+/// Inheritance (https://github.com/funkwerk/accessors/issues/5)
+unittest
+{
+    class A
+    {
+        @Read
+        string foo_;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    class B : A
+    {
+        @Read
+        string bar_;
+
+        mixin(GenerateFieldAccessors);
     }
 }
