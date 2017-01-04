@@ -37,7 +37,7 @@ mixin template GenerateFieldAccessorMethods()
 
         string result = "";
 
-        foreach (name; Filter!(isNotThis, __traits(allMembers, typeof(this))))
+        foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
         {
             alias field = Alias!(__traits(getMember, typeof(this), name));
 
