@@ -1,4 +1,4 @@
-module accessors_;
+module accessors;
 
 struct Read
 {
