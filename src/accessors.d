@@ -22,7 +22,7 @@ struct Write
 
 immutable string GenerateFieldAccessors = `
     mixin GenerateFieldAccessorMethods;
-    mixin(GenerateFieldAccessorMethods2);
+    mixin(GenerateFieldAccessorMethodsImpl);
     `;
 
 mixin template GenerateFieldAccessorMethods()
@@ -31,7 +31,7 @@ mixin template GenerateFieldAccessorMethods()
 
     private enum bool isNotThis(string T) = T != "this";
 
-    static enum GenerateFieldAccessorMethods2()
+    static enum GenerateFieldAccessorMethodsImpl()
     {
         import std.traits : hasUDA;
 
