@@ -22,7 +22,7 @@ struct Write
 
 immutable string GenerateFieldAccessors = `
     mixin GenerateFieldAccessorMethods;
-    mixin(GenerateFieldAccessorMethods);
+    mixin(GenerateFieldAccessorMethodsImpl);
     `;
 
 mixin template GenerateFieldAccessorMethods()
@@ -31,13 +31,13 @@ mixin template GenerateFieldAccessorMethods()
 
     private enum bool isNotThis(string T) = T != "this";
 
-    static enum GenerateFieldAccessorMethods()
+    static enum GenerateFieldAccessorMethodsImpl()
     {
         import std.traits : hasUDA;
 
         string result = "";
 
-        foreach (name; Filter!(isNotThis, __traits(allMembers, typeof(this))))
+        foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
         {
             alias field = Alias!(__traits(getMember, typeof(this), name));
 
@@ -664,5 +664,25 @@ unittest
         auto y = foo;
 
         static assert(is(typeof(y) == const(X)[]));
+    }
+}
+
+/// Inheritance (https://github.com/funkwerk/accessors/issues/5)
+unittest
+{
+    class A
+    {
+        @Read
+        string foo_;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    class B : A
+    {
+        @Read
+        string bar_;
+
+        mixin(GenerateFieldAccessors);
     }
 }
