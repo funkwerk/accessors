@@ -23,12 +23,12 @@ class WithAccessors
 `@Read` and `@Write` generate the following two methods:
 
 ```d
-public final inout(int) num() inout
+public final @property inout(int) num() inout
 {
     return this.num_;
 }
 
-public final void num(int num)
+public final @property void num(int num)
 {
     this.num_ = num;
 }

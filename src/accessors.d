@@ -96,13 +96,13 @@ template GenerateReader(string name, alias field)
         {
             enum valueType = typeName!(MutableOf!(ForeachType!(typeof(field))));
 
-            return format("%s final inout(%s)[] %s() inout " ~
+            return format("%s final @property inout(%s)[] %s() inout " ~
                 "{ inout(%s)[] result = null; result ~= this.%s; return result; }",
                 visibility, valueType, accessorName, valueType, name);
         }
         else
         {
-            return format("%s final inout(%s) %s() inout { return this.%s; }",
+            return format("%s final @property inout(%s) %s() inout { return this.%s; }",
                 visibility, outputType, accessorName, name);
         }
     }
@@ -116,11 +116,11 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateReader!("foo", integerValue) ==
-        "public final inout(int) foo() inout { return this.foo; }");
+        "public final @property inout(int) foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", stringValue) ==
-        "public final inout(string) foo() inout { return this.foo; }");
+        "public final @property inout(string) foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final inout(int)[] foo() inout " ~
+        "public final @property inout(int)[] foo() inout " ~
         "{ inout(int)[] result = null; result ~= this.foo; return result; }");
 }
 
@@ -136,7 +136,7 @@ template GenerateRefReader(string name, alias field)
         enum outputType = typeName!(typeof(field));
         enum accessorName = accessor(name);
 
-        return format("%s final ref %s %s() { return this.%s; }",
+        return format("%s final @property ref %s %s() { return this.%s; }",
             visibility, outputType, accessorName, name);
     }
 }
@@ -149,11 +149,11 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateRefReader!("foo", integerValue) ==
-        "public final ref int foo() { return this.foo; }");
+        "public final @property ref int foo() { return this.foo; }");
     static assert(GenerateRefReader!("foo", stringValue) ==
-        "public final ref string foo() { return this.foo; }");
+        "public final @property ref string foo() { return this.foo; }");
     static assert(GenerateRefReader!("foo", intArrayValue) ==
-        "public final ref int[] foo() { return this.foo; }");
+        "public final @property ref int[] foo() { return this.foo; }");
 }
 
 template GenerateConstReader(string name, alias field)
@@ -168,7 +168,7 @@ template GenerateConstReader(string name, alias field)
         enum outputType = typeName!(typeof(field));
         enum accessorName = accessor(name);
 
-        return format("%s final const(%s) %s() const { return this.%s; }",
+        return format("%s final @property const(%s) %s() const { return this.%s; }",
             visibility, outputType, accessorName, name);
     }
 }
@@ -187,7 +187,7 @@ template GenerateWriter(string name, alias field)
         enum inputName = accessorName;
         enum needToDup = needToDup!field;
 
-        return format("%s final void %s(%s %s) { this.%s = %s%s; }",
+        return format("%s final @property void %s(%s %s) { this.%s = %s%s; }",
             visibility, accessorName, inputType, inputName, name, inputName, needToDup ? ".dup" : "");
     }
 }
@@ -200,11 +200,11 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateWriter!("foo", integerValue) ==
-        "public final void foo(int foo) { this.foo = foo; }");
+        "public final @property void foo(int foo) { this.foo = foo; }");
     static assert(GenerateWriter!("foo", stringValue) ==
-        "public final void foo(string foo) { this.foo = foo; }");
+        "public final @property void foo(string foo) { this.foo = foo; }");
     static assert(GenerateWriter!("foo", intArrayValue) ==
-        "public final void foo(int[] foo) { this.foo = foo.dup; }");
+        "public final @property void foo(int[] foo) { this.foo = foo.dup; }");
 }
 
 /**
@@ -408,6 +408,8 @@ unittest
         test = No.someFlag;
 
         assert(test == No.someFlag);
+
+        static assert(is(typeof(test) == Flag!"someFlag"));
     }
 }
 
@@ -428,6 +430,8 @@ unittest
     {
         assert(!test.isNull);
         assert(test.get == "X");
+
+        static assert(is(typeof(test) == Nullable!string));
     }
 }
 
@@ -448,6 +452,9 @@ unittest
     mutableObject.i_ = 42;
 
     assert(mutableObject.i == 42);
+
+    static assert(is(typeof(mutableObject.i) == int));
+    static assert(is(typeof(constObject.i) == const(int)));
 }
 
 /// Creates ref reader.
@@ -466,6 +473,7 @@ unittest
     mutableTestObject.i = 42;
 
     assert(mutableTestObject.i == 42);
+    static assert(is(typeof(mutableTestObject.i) == int));
 }
 
 /// Creates writer.
@@ -484,6 +492,7 @@ unittest
 
     assert(mutableTestObject.i == 42);
     static assert(!__traits(compiles, mutableTestObject.i += 1));
+    static assert(is(typeof(mutableTestObject.i) == int));
 }
 
 /// Checks whether hasUDA can be used for each member.
@@ -540,6 +549,7 @@ unittest
     {
         s = "foo";
         assert(s == "foo");
+        static assert(is(typeof(s) == string));
     }
 }
 
@@ -556,7 +566,7 @@ unittest
         @RefRead
         private string str_;
 
-        public const(string) str() const
+        public @property const(string) str() const
         {
             return this.str_.dup;
         }
@@ -590,6 +600,7 @@ unittest
         x_ = new X;
 
         assert(x == x_);
+        static assert(is(typeof(x) == X));
     }
 }
 
@@ -615,6 +626,9 @@ unittest
     mutableObject.s_.i = 42;
 
     assert(constObject.s.i == 42);
+
+    static assert(is(typeof(mutableObject.s) == Test.S));
+    static assert(is(typeof(constObject.s) == const(Test.S)));
 }
 
 /// Reader for structs return copies.
@@ -664,6 +678,24 @@ unittest
         auto y = foo;
 
         static assert(is(typeof(y) == const(X)[]));
+        static assert(is(typeof(foo) == const(X)[]));
+    }
+}
+
+/// Property has correct type.
+unittest
+{
+    class C
+    {
+        @Read
+        private int foo_;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    with (new C)
+    {
+        static assert(is(typeof(foo) == int));
     }
 }
 
