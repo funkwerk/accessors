@@ -690,11 +690,6 @@ unittest
         @Read
         private int foo_;
 
-        final inout(int) fooMethod() inout
-        {
-            return foo_;
-        }
-
         mixin(GenerateFieldAccessors);
     }
 
