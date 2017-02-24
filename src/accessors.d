@@ -43,34 +43,32 @@ mixin template GenerateFieldAccessorMethods()
 
             static if (__traits(compiles, hasUDA!(field, Read)))
             {
-                string declaration = "";
-
                 static if (hasUDA!(field, Read))
                 {
-                    declaration = GenerateReader!(name, field);
-                    debug (accessors) pragma(msg, declaration);
-                    result ~= declaration;
+                    enum string readerDecl = GenerateReader!(name, field);
+                    debug (accessors) pragma(msg, readerDecl);
+                    result ~= readerDecl;
                 }
 
                 static if (hasUDA!(field, RefRead))
                 {
-                    declaration = GenerateRefReader!(name, field);
-                    debug (accessors) pragma(msg, declaration);
-                    result ~= declaration;
+                    enum string refReaderDecl = GenerateRefReader!(name, field);
+                    debug (accessors) pragma(msg, refReaderDecl);
+                    result ~= refReaderDecl;
                 }
 
                 static if (hasUDA!(field, ConstRead))
                 {
-                    declaration = GenerateConstReader!(name, field);
-                    debug (accessors) pragma(msg, declaration);
-                    result ~= declaration;
+                    enum string constReaderDecl = GenerateConstReader!(name, field);
+                    debug (accessors) pragma(msg, constReaderDecl);
+                    result ~= constReaderDecl;
                 }
 
                 static if (hasUDA!(field, Write))
                 {
-                    declaration = GenerateWriter!(name, field);
-                    debug (accessors) pragma(msg, declaration);
-                    result ~= declaration;
+                    enum string writerDecl = GenerateWriter!(name, field);
+                    debug (accessors) pragma(msg, writerDecl);
+                    result ~= writerDecl;
                 }
             }
         }
