@@ -1,5 +1,7 @@
 module accessors;
 
+import std.traits;
+
 struct Read
 {
     string visibility = "public";
@@ -33,8 +35,6 @@ mixin template GenerateFieldAccessorMethods()
 
     static enum GenerateFieldAccessorMethodsImpl()
     {
-        import std.traits : hasUDA;
-
         string result = "";
 
         foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
@@ -88,10 +88,51 @@ template GenerateReader(string name, alias field)
 
         enum visibility = getVisibility!(field, Read);
         enum accessorName = accessor(name);
+        enum needToDup = needToDup!field;
 
-        static if (isArray!(typeof(field)) && !isSomeString!(typeof(field)))
+        static if (needToDup)
         {
-            return format("%s final @property auto %s() inout pure nothrow @safe {"
+            alias elementType = typeof(field[0]);
+        }
+        else
+        {
+            alias elementType = typeof(field);
+        }
+
+        string attributes = "";
+        static if (hasElaborateCopyConstructor!elementType)
+        {
+            alias postblitAttrs = functionAttributes!(elementType.__postblit);
+
+            static if (postblitAttrs & FunctionAttribute.pure_)
+            {
+                attributes ~= "pure ";
+            }
+            static if (postblitAttrs & FunctionAttribute.nothrow_)
+            {
+                attributes ~= "nothrow ";
+            }
+            static if (postblitAttrs & FunctionAttribute.safe)
+            {
+                attributes ~= "@safe ";
+            }
+            static if (postblitAttrs & FunctionAttribute.nogc && !needToDup)
+            {
+                attributes ~= "@nogc ";
+            }
+        }
+        else static if (needToDup)
+        {
+            attributes = "pure nothrow @safe ";
+        }
+        else
+        {
+            attributes = "pure nothrow @safe @nogc ";
+        }
+
+        static if (needToDup)
+        {
+            return format("%s final @property auto %s() inout " ~ attributes ~ " {"
                         ~ "import std.traits;"
                         ~ "inout(ForeachType!(typeof(this.%s)))[] result = null;"
                         ~ "return result ~ this.%s;"
@@ -100,7 +141,8 @@ template GenerateReader(string name, alias field)
         }
         else
         {
-           return format("%s final @property auto %s() inout { return this.%s; }",
+           return format("%s final @property auto %s() inout "
+                       ~ attributes ~ "{ return this.%s; }",
                          visibility, accessorName, name);
         }
     }
@@ -173,9 +215,36 @@ template GenerateConstReader(string name, alias field)
         enum visibility = getVisibility!(field, RefRead);
         enum accessorName = accessor(name);
 
-        return format("%s final @property auto %s() " ~
-            "const pure nothrow @safe @nogc { return this.%s; }",
-            visibility, accessorName, name);
+        string attributes = "";
+        static if (hasElaborateCopyConstructor!(typeof(field)))
+        {
+            alias postblitAttrs = functionAttributes!(field.__postblit);
+
+            static if (postblitAttrs & FunctionAttribute.pure_)
+            {
+                attributes ~= "pure ";
+            }
+            static if (postblitAttrs & FunctionAttribute.nothrow_)
+            {
+                attributes ~= "nothrow ";
+            }
+            static if (postblitAttrs & FunctionAttribute.safe)
+            {
+                attributes ~= "@safe ";
+            }
+            static if (postblitAttrs & FunctionAttribute.nogc)
+            {
+                attributes ~= "@nogc ";
+            }
+        }
+        else
+        {
+            attributes = "pure nothrow @safe @nogc ";
+        }
+
+        return format("%s final @property auto %s() const " ~
+            attributes ~ "{ return this.%s; }",
+            visibility, outputType, accessorName, name);
     }
 }
 
@@ -192,6 +261,26 @@ template GenerateWriter(string name, alias field)
         enum inputType = typeName!(typeof(field));
         enum inputName = accessorName;
         enum needToDup = needToDup!field;
+
+        static if (needToDup)
+        {
+            alias elementType = typeof(field[0]);
+        }
+        else
+        {
+            alias elementType = typeof(field);
+        }
+
+        string attributes = "";
+        uint attrs;
+        static if (hasElaborateCopyConstructor!elementType)
+        {
+            attrs &= functionAttributes!(elementType.__postblit);
+        }
+        static if (hasElaborateDestructor!elementType)
+        {
+            attrs &= functionAttributes!(elementType.__dtor);
+        }
 
         return format("%s final @property void %s(%s %s) pure nothrow @safe { this.%s = %s%s; }",
             visibility, accessorName, inputType, inputName, name, inputName, needToDup ? ".dup" : "");
@@ -229,7 +318,6 @@ private template typeName(T)
     static enum helper()
     {
         import std.array : replaceLast;
-        import std.traits : fullyQualifiedName;
 
         static if (T.stringof == "Flag" || T.stringof == "const(Flag)")
         {
@@ -275,7 +363,6 @@ private template localTypeName(T)
     {
         import std.algorithm : find, startsWith;
         import std.array : replaceLast;
-        import std.traits : fullyQualifiedName, moduleName, Unqual;
 
         alias fullyQualifiedTypeName = fullyQualifiedName!(Unqual!T);
         string typeName = fullyQualifiedTypeName[moduleName!T.length + 1 .. $];
@@ -307,8 +394,6 @@ private template needToDup(alias field)
 
     static enum helper()
     {
-        import std.traits : isArray, isSomeString;
-
         static if (isSomeString!(typeof(field)))
         {
             return false;
@@ -351,7 +436,6 @@ pure nothrow @safe @nogc unittest
  */
 template getVisibility(alias field, A)
 {
-    import std.traits : getUDAs;
     import std.string : format;
 
     enum getVisibility = helper;
@@ -708,7 +792,7 @@ pure nothrow @safe unittest
     }
 }
 
-/// Inheritance (https://github.com/funkwerk/accessors/issues/5)
+/// Inheritance (https://github.com/funkwerk/accessors/issues/5).
 pure nothrow @safe @nogc unittest
 {
     class A
@@ -728,23 +812,28 @@ pure nothrow @safe @nogc unittest
     }
 }
 
-/// @Read property returns array with mutable elements.
+/// Transfers struct attributes.
 unittest
 {
-    struct Field
-    {
-    }
-
     struct S
     {
-        @Read
-        Field[] foo_;
+        this(this)
+        {
+        }
 
-        mixin(GenerateFieldAccessors);
+        void opAssign(S s)
+        {
+        }
     }
 
-    with (S())
+    class A
     {
-        Field[] arr = foo;
+        @Read
+        S[] foo1_;
+
+        @ConstRead
+        S foo2_;
+
+        mixin(GenerateFieldAccessors);
     }
 }
