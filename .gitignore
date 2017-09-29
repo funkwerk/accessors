@@ -2,3 +2,4 @@
 .dub
 __test__*__
 /accessors-test-library
+/accessors

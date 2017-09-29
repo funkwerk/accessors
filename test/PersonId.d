@@ -1,0 +1,5 @@
+module PersonId;
+
+class PersonId
+{
+}

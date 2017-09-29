@@ -11,6 +11,12 @@
 	"configurations": [
 		{
 			"name": "library"
+		},
+		{
+			"name": "unittest",
+			"targetType": "executable",
+			"sourcePaths": ["test"],
+			"mainSourceFile": "test/main.d"
 		}
 	]
 }
