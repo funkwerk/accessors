@@ -5,7 +5,7 @@ void main()
 }
 
 // Issue #11: https://github.com/funkwerk/accessors/issues/11
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     import PersonId : AnotherPersonId = PersonId;
 
