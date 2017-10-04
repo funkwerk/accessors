@@ -92,11 +92,9 @@ template GenerateReader(string name, alias field)
         static if (isArray!(typeof(field)) && !isSomeString!(typeof(field)))
         {
             return format("%s final @property auto %s() inout {"
-                        ~ "import std.traits : ForeachType;"
-                        ~ "inout(ForeachType!(typeof(this.%s)))[] result = null;"
-                        ~ "return result ~ this.%s;"
+                        ~ "return [] ~ this.%s;"
                         ~ "}",
-                          visibility, accessorName, name, name);
+                          visibility, accessorName, name);
         }
         else
         {
@@ -119,9 +117,7 @@ unittest
         "public final @property auto foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
         "public final @property auto foo() inout {"
-      ~ "import std.traits : ForeachType;"
-      ~ "inout(ForeachType!(typeof(this.foo)))[] result = null;"
-      ~ "return result ~ this.foo;"
+      ~ "return [] ~ this.foo;"
       ~ "}");
 }
 
