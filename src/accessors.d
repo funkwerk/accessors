@@ -104,7 +104,7 @@ template GenerateReader(string name, alias field)
 
         static if (needToDup)
         {
-            return format("%s final @property auto %s() inout %s {"
+            return format("%s final @property auto %s() inout %s{"
                         ~ "import std.traits;"
                         ~ "inout(ForeachType!(typeof(this.%s)))[] result = null;"
                         ~ "return result ~ this.%s;"
@@ -113,7 +113,7 @@ template GenerateReader(string name, alias field)
         }
         else
         {
-            return format("%s final @property auto %s() inout %s { return this.%s; }",
+            return format("%s final @property auto %s() inout %s{ return this.%s; }",
                 visibility, accessorName, attributes, name);
         }
     }
@@ -190,7 +190,7 @@ template GenerateConstReader(string name, alias field)
         string attributes = generateAttributeString!postblitAttrs;
 
         return format("%s final @property auto %s() const %s { return this.%s; }",
-            visibility, outputType, accessorName, attributes, name);
+            visibility, accessorName, attributes, name);
     }
 }
 
