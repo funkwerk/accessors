@@ -120,7 +120,7 @@ template GenerateReader(string name, alias field)
 }
 
 ///
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     int integerValue;
     string stringValue;
@@ -128,12 +128,12 @@ pure nothrow @safe @nogc unittest
 
     static assert(GenerateReader!("foo", integerValue) ==
         "public final @property auto foo() " ~
-        "inout pure nothrow @safe @nogc { return this.foo; }");
+        "inout @nogc nothrow pure @safe { return this.foo; }");
     static assert(GenerateReader!("foo", stringValue) ==
         "public final @property auto foo() " ~
-        "inout pure nothrow @safe @nogc { return this.foo; }");
+        "inout @nogc nothrow pure @safe { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final @property auto foo() inout pure nothrow @safe {"
+        "public final @property auto foo() inout nothrow pure @safe {"
       ~ "import std.traits : ForeachType;"
       ~ "inout(ForeachType!(typeof(this.foo)))[] result = null;"
       ~ "return result ~ this.foo;"
@@ -152,13 +152,13 @@ template GenerateRefReader(string name, alias field)
         enum accessorName = accessor(name);
 
         return format("%s final @property ref auto %s() " ~
-            "pure nothrow @safe @nogc { return this.%s; }",
+            "@nogc nothrow pure @safe { return this.%s; }",
             visibility, accessorName, name);
     }
 }
 
 ///
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     int integerValue;
     string stringValue;
@@ -166,13 +166,13 @@ pure nothrow @safe @nogc unittest
 
     static assert(GenerateRefReader!("foo", integerValue) ==
         "public final @property ref auto foo() " ~
-        "pure nothrow @safe @nogc { return this.foo; }");
+        "@nogc nothrow pure @safe { return this.foo; }");
     static assert(GenerateRefReader!("foo", stringValue) ==
         "public final @property ref auto foo() " ~
-        "pure nothrow @safe @nogc { return this.foo; }");
+        "@nogc nothrow pure @safe { return this.foo; }");
     static assert(GenerateRefReader!("foo", intArrayValue) ==
         "public final @property ref auto foo() " ~
-        "pure nothrow @safe @nogc { return this.foo; }");
+        "@nogc nothrow pure @safe { return this.foo; }");
 }
 
 template GenerateConstReader(string name, alias field)
@@ -233,7 +233,7 @@ template GenerateWriter(string name, alias field)
 }
 
 ///
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     int integerValue;
     string stringValue;
@@ -241,13 +241,13 @@ pure nothrow @safe @nogc unittest
 
     static assert(GenerateWriter!("foo", integerValue) ==
         "public final @property void foo(int foo) " ~
-        "pure nothrow @safe @nogc { this.foo = foo; }");
+        "@nogc nothrow pure @safe { this.foo = foo; }");
     static assert(GenerateWriter!("foo", stringValue) ==
         "public final @property void foo(string foo) " ~
-        "pure nothrow @safe @nogc { this.foo = foo; }");
+        "@nogc nothrow pure @safe { this.foo = foo; }");
     static assert(GenerateWriter!("foo", intArrayValue) ==
         "public final @property void foo(int[] foo) " ~
-        "pure nothrow @safe { this.foo = foo.dup; }");
+        "nothrow pure @safe { this.foo = foo.dup; }");
 }
 
 private enum uint defaultFunctionAttributes =
@@ -317,21 +317,21 @@ private template generateAttributeString(uint attributeMask)
     {
         string attributes;
 
-        static if (attributeMask & FunctionAttribute.pure_)
+        static if (attributeMask & FunctionAttribute.nogc)
         {
-            attributes ~= "pure ";
+            attributes ~= "@nogc ";
         }
         static if (attributeMask & FunctionAttribute.nothrow_)
         {
             attributes ~= "nothrow ";
         }
+        static if (attributeMask & FunctionAttribute.pure_)
+        {
+            attributes ~= "pure ";
+        }
         static if (attributeMask & FunctionAttribute.safe)
         {
             attributes ~= "@safe ";
-        }
-        static if (attributeMask & FunctionAttribute.nogc)
-        {
-            attributes ~= "@nogc ";
         }
 
         return attributes;
@@ -371,7 +371,7 @@ private template typeName(T)
     }
 }
 
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     import std.typecons : Flag, BitFlags, Yes, No;
 
@@ -412,7 +412,7 @@ private template localTypeName(T)
     }
 }
 
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     class C
     {
@@ -438,7 +438,7 @@ private template needToDup(alias field)
     }
 }
 
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     int integerField;
     int[] integerArrayField;
@@ -449,7 +449,7 @@ pure nothrow @safe @nogc unittest
     static assert(!needToDup!stringField);
 }
 
-static string accessor(string name) pure nothrow @safe @nogc
+static string accessor(string name) @nogc nothrow pure @safe
 {
     import std.string : chomp, chompPrefix;
 
@@ -457,7 +457,7 @@ static string accessor(string name) pure nothrow @safe @nogc
 }
 
 ///
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     assert(accessor("foo_") == "foo");
     assert(accessor("_foo") == "foo");
@@ -495,7 +495,7 @@ template getVisibility(alias field, A)
 }
 
 ///
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     @Read("public") int publicInt;
     @Read("package") int packageInt;
@@ -514,7 +514,7 @@ pure nothrow @safe @nogc unittest
 }
 
 /// Creates accessors for flags.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     import std.typecons : Flag, No, Yes;
 
@@ -540,7 +540,7 @@ pure nothrow @safe unittest
 }
 
 /// Creates accessors for Nullables.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     import std.typecons : Nullable;
 
@@ -562,7 +562,7 @@ pure nothrow @safe unittest
 }
 
 /// Creates non-const reader.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -584,7 +584,7 @@ pure nothrow @safe unittest
 }
 
 /// Creates ref reader.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -603,7 +603,7 @@ pure nothrow @safe unittest
 }
 
 /// Creates writer.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -622,7 +622,7 @@ pure nothrow @safe unittest
 }
 
 /// Checks whether hasUDA can be used for each member.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -642,7 +642,7 @@ pure nothrow @safe unittest
 }
 
 /// Returns non const for PODs and structs.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     import std.algorithm : map, sort;
     import std.array : array;
@@ -661,7 +661,7 @@ pure nothrow @safe unittest
 }
 
 /// Regression.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class C
     {
@@ -680,7 +680,7 @@ pure nothrow @safe unittest
 }
 
 /// Supports user-defined accessors.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class C
     {
@@ -731,7 +731,7 @@ pure nothrow @safe unittest
 }
 
 /// Creates const reader for simple structs.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -758,7 +758,7 @@ pure nothrow @safe unittest
 }
 
 /// Reader for structs return copies.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -781,7 +781,7 @@ pure nothrow @safe unittest
 }
 
 /// Creates reader for const arrays.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class X
     {
@@ -809,7 +809,7 @@ pure nothrow @safe unittest
 }
 
 /// Property has correct type.
-pure nothrow @safe unittest
+nothrow pure @safe unittest
 {
     class C
     {
@@ -826,7 +826,7 @@ pure nothrow @safe unittest
 }
 
 /// Inheritance (https://github.com/funkwerk/accessors/issues/5).
-pure nothrow @safe @nogc unittest
+@nogc nothrow pure @safe unittest
 {
     class A
     {
