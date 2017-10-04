@@ -105,7 +105,7 @@ template GenerateReader(string name, alias field)
         static if (needToDup)
         {
             return format("%s final @property auto %s() inout %s{"
-                        ~ "import std.traits;"
+                        ~ "import std.traits : ForeachType;"
                         ~ "inout(ForeachType!(typeof(this.%s)))[] result = null;"
                         ~ "return result ~ this.%s;"
                         ~ "}",
@@ -134,7 +134,7 @@ pure nothrow @safe @nogc unittest
         "inout pure nothrow @safe @nogc { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
         "public final @property auto foo() inout pure nothrow @safe {"
-      ~ "import std.traits;"
+      ~ "import std.traits : ForeachType;"
       ~ "inout(ForeachType!(typeof(this.foo)))[] result = null;"
       ~ "return result ~ this.foo;"
       ~ "}");
