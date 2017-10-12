@@ -104,7 +104,7 @@ template GenerateReader(string name, alias field)
 
         static if (needToDup)
         {
-            return format("%s final @property auto %s() inout %s{"
+            return format("%s final @property auto %s() %s{"
                         ~ "return [] ~ this.%s;"
                         ~ "}",
                           visibility, accessorName, attributes, name);
@@ -131,7 +131,7 @@ template GenerateReader(string name, alias field)
         "public final @property auto foo() " ~
         "inout @nogc nothrow pure @safe { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final @property auto foo() inout nothrow pure @safe {"
+        "public final @property auto foo() nothrow pure @safe {"
       ~ "return [] ~ this.foo;"
       ~ "}");
 }
@@ -867,5 +867,26 @@ unittest
         S foo3_;
 
         mixin(GenerateFieldAccessors);
+    }
+}
+
+/// @Read property returns array with mutable elements.
+unittest
+{
+    struct Field
+    {
+    }
+
+    struct S
+    {
+        @Read
+        Field[] foo_;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    with (S())
+    {
+        Field[] arr = foo;
     }
 }
