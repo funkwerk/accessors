@@ -841,7 +841,7 @@ nothrow pure @safe unittest
 }
 
 /// Transfers struct attributes.
-unittest
+@nogc nothrow pure @safe unittest
 {
     struct S
     {
@@ -870,7 +870,7 @@ unittest
 }
 
 /// @Read property returns array with mutable elements.
-unittest
+nothrow pure @safe unittest
 {
     struct Field
     {
