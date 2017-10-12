@@ -84,7 +84,6 @@ template GenerateReader(string name, alias field)
     static enum helper()
     {
         import std.string : format;
-        import std.traits : isArray, isSomeString;
 
         enum visibility = getVisibility!(field, Read);
         enum accessorName = accessor(name);
