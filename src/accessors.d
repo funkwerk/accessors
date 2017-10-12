@@ -91,7 +91,7 @@ template GenerateReader(string name, alias field)
 
         static if (isArray!(typeof(field)) && !isSomeString!(typeof(field)))
         {
-            return format("%s final @property auto %s() inout {"
+            return format("%s final @property auto %s() {"
                         ~ "return [] ~ this.%s;"
                         ~ "}",
                           visibility, accessorName, name);
@@ -116,7 +116,7 @@ unittest
     static assert(GenerateReader!("foo", stringValue) ==
         "public final @property auto foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final @property auto foo() inout {"
+        "public final @property auto foo() {"
       ~ "return [] ~ this.foo;"
       ~ "}");
 }
@@ -711,5 +711,26 @@ unittest
         string bar_;
 
         mixin(GenerateFieldAccessors);
+    }
+}
+
+/// @Read property returns array with mutable elements.
+unittest
+{
+    struct Field
+    {
+    }
+
+    struct S
+    {
+        @Read
+        Field[] foo_;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    with (S())
+    {
+        Field[] arr = foo;
     }
 }
