@@ -35,6 +35,8 @@ mixin template GenerateFieldAccessorMethods()
 
     static enum GenerateFieldAccessorMethodsImpl()
     {
+        import std.traits : hasUDA;
+
         string result = "";
 
         foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
