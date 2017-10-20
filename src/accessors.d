@@ -84,24 +84,22 @@ template GenerateReader(string name, alias field)
     static enum helper()
     {
         import std.string : format;
-        import std.traits : ForeachType, isArray, isSomeString, MutableOf;
+        import std.traits : isArray, isSomeString;
 
         enum visibility = getVisibility!(field, Read);
-        enum outputType = typeName!(typeof(field));
         enum accessorName = accessor(name);
 
         static if (isArray!(typeof(field)) && !isSomeString!(typeof(field)))
         {
-            enum valueType = typeName!(MutableOf!(ForeachType!(typeof(field))));
-
-            return format("%s final @property inout(%s)[] %s() inout " ~
-                "{ inout(%s)[] result = null; result ~= this.%s; return result; }",
-                visibility, valueType, accessorName, valueType, name);
+            return format("%s final @property auto %s() {"
+                        ~ "return [] ~ this.%s;"
+                        ~ "}",
+                          visibility, accessorName, name);
         }
         else
         {
-            return format("%s final @property inout(%s) %s() inout { return this.%s; }",
-                visibility, outputType, accessorName, name);
+           return format("%s final @property auto %s() inout { return this.%s; }",
+                         visibility, accessorName, name);
         }
     }
 }
@@ -114,12 +112,13 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateReader!("foo", integerValue) ==
-        "public final @property inout(int) foo() inout { return this.foo; }");
+        "public final @property auto foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", stringValue) ==
-        "public final @property inout(string) foo() inout { return this.foo; }");
+        "public final @property auto foo() inout { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final @property inout(int)[] foo() inout " ~
-        "{ inout(int)[] result = null; result ~= this.foo; return result; }");
+        "public final @property auto foo() {"
+      ~ "return [] ~ this.foo;"
+      ~ "}");
 }
 
 template GenerateRefReader(string name, alias field)
@@ -131,11 +130,10 @@ template GenerateRefReader(string name, alias field)
         import std.string : format;
 
         enum visibility = getVisibility!(field, RefRead);
-        enum outputType = typeName!(typeof(field));
         enum accessorName = accessor(name);
 
-        return format("%s final @property ref %s %s() { return this.%s; }",
-            visibility, outputType, accessorName, name);
+        return format("%s final @property ref auto %s() { return this.%s; }",
+                      visibility, accessorName, name);
     }
 }
 
@@ -147,11 +145,11 @@ unittest
     int[] intArrayValue;
 
     static assert(GenerateRefReader!("foo", integerValue) ==
-        "public final @property ref int foo() { return this.foo; }");
+        "public final @property ref auto foo() { return this.foo; }");
     static assert(GenerateRefReader!("foo", stringValue) ==
-        "public final @property ref string foo() { return this.foo; }");
+        "public final @property ref auto foo() { return this.foo; }");
     static assert(GenerateRefReader!("foo", intArrayValue) ==
-        "public final @property ref int[] foo() { return this.foo; }");
+        "public final @property ref auto foo() { return this.foo; }");
 }
 
 template GenerateConstReader(string name, alias field)
@@ -163,11 +161,10 @@ template GenerateConstReader(string name, alias field)
         import std.string : format;
 
         enum visibility = getVisibility!(field, RefRead);
-        enum outputType = typeName!(typeof(field));
         enum accessorName = accessor(name);
 
-        return format("%s final @property const(%s) %s() const { return this.%s; }",
-            visibility, outputType, accessorName, name);
+        return format("%s final @property auto %s() const { return this.%s; }",
+                      visibility, accessorName, name);
     }
 }
 
@@ -714,5 +711,26 @@ unittest
         string bar_;
 
         mixin(GenerateFieldAccessors);
+    }
+}
+
+/// @Read property returns array with mutable elements.
+unittest
+{
+    struct Field
+    {
+    }
+
+    struct S
+    {
+        @Read
+        Field[] foo_;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    with (S())
+    {
+        Field[] arr = foo;
     }
 }
