@@ -93,27 +93,26 @@ template GenerateReader(string name, alias field)
 
         static if (needToDup)
         {
-            enum uint postblitAttrs = inferAttributes!(typeof(field[0]), "__postblit") &
+            enum uint attributes = inferAttributes!(typeof(field[0]), "__postblit") &
                 ~FunctionAttribute.nogc;
         }
         else
         {
-            enum uint postblitAttrs = inferAttributes!(typeof(field), "__postblit");
+            enum uint attributes = inferAttributes!(typeof(field), "__postblit");
         }
 
-        string attributes = generateAttributeString!postblitAttrs;
+        string attributesString = generateAttributeString!attributes;
 
         static if (needToDup)
         {
-            return format("%s final @property auto %s() %s{"
-                        ~ "return [] ~ this.%s;"
-                        ~ "}",
-                          visibility, accessorName, attributes, name);
+            return format("%s final @property auto %s() %s"
+                        ~ "{ return [] ~ this.%s; }",
+                          visibility, accessorName, attributesString, name);
         }
         else
         {
             return format("%s final @property auto %s() inout %s{ return this.%s; }",
-                visibility, accessorName, attributes, name);
+                visibility, accessorName, attributesString, name);
         }
     }
 }
@@ -132,9 +131,8 @@ template GenerateReader(string name, alias field)
         "public final @property auto foo() " ~
         "inout @nogc nothrow pure @safe { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final @property auto foo() nothrow pure @safe {"
-      ~ "return [] ~ this.foo;"
-      ~ "}");
+        "public final @property auto foo() nothrow pure @safe "
+      ~ "{ return [] ~ this.foo; }");
 }
 
 template GenerateRefReader(string name, alias field)
@@ -183,11 +181,11 @@ template GenerateConstReader(string name, alias field)
         enum visibility = getVisibility!(field, RefRead);
         enum accessorName = accessor(name);
 
-        alias postblitAttrs = inferAttributes!(typeof(field), "__postblit");
-        string attributes = generateAttributeString!postblitAttrs;
+        alias attributes = inferAttributes!(typeof(field), "__postblit");
+        string attributesString = generateAttributeString!attributes;
 
         return format("%s final @property auto %s() const %s { return this.%s; }",
-            visibility, accessorName, attributes, name);
+            visibility, accessorName, attributesString, name);
     }
 }
 
@@ -207,7 +205,7 @@ template GenerateWriter(string name, alias field)
 
         static if (needToDup)
         {
-            enum attributeMask = defaultFunctionAttributes &
+            enum attributes = defaultFunctionAttributes &
                 ~FunctionAttribute.nogc &
                 inferAssignAttributes!(typeof(field[0])) &
                 inferAttributes!(typeof(field[0]), "__postblit") &
@@ -215,17 +213,17 @@ template GenerateWriter(string name, alias field)
         }
         else
         {
-            enum attributeMask = defaultFunctionAttributes &
+            enum attributes = defaultFunctionAttributes &
                 inferAssignAttributes!(typeof(field)) &
                 inferAttributes!(typeof(field), "__postblit") &
                 inferAttributes!(typeof(field), "__dtor");
         }
 
-        enum attributes = generateAttributeString!attributeMask;
+        enum attributesString = generateAttributeString!attributes;
 
         return format("%s final @property void %s(%s %s) %s{ this.%s = %s%s; }",
             visibility, accessorName, inputType, inputName,
-            attributes, name, inputName, needToDup ? ".dup" : "");
+            attributesString, name, inputName, needToDup ? ".dup" : "");
     }
 }
 
@@ -257,23 +255,23 @@ private template inferAttributes(T, string M)
 {
     enum uint inferAttributes()
     {
-        uint attrs = defaultFunctionAttributes;
+        uint attributes = defaultFunctionAttributes;
 
         static if (is(T == struct))
         {
             static if (hasMember!(T, M))
             {
-                attrs &= functionAttributes!(T.__postblit);
+                attributes &= functionAttributes!(__traits(getMember, T, M));
             }
             else
             {
                 foreach (field; Fields!T)
                 {
-                    attrs &= inferAttributes!(field, M);
+                    attributes &= inferAttributes!(field, M);
                 }
             }
         }
-        return attrs;
+        return attributes;
     }
 }
 
@@ -281,7 +279,7 @@ private template inferAssignAttributes(T)
 {
     enum uint inferAssignAttributes()
     {
-        uint attrs = defaultFunctionAttributes;
+        uint attributes = defaultFunctionAttributes;
 
         static if (is(T == struct))
         {
@@ -292,7 +290,7 @@ private template inferAssignAttributes(T)
                     alias params = Parameters!o;
                     static if (params.length == 1 && is(params[0] == T))
                     {
-                        attrs &= functionAttributes!o;
+                        attributes &= functionAttributes!o;
                     }
                 }
             }
@@ -300,38 +298,38 @@ private template inferAssignAttributes(T)
             {
                 foreach (field; Fields!T)
                 {
-                    attrs &= inferAssignAttributes!field;
+                    attributes &= inferAssignAttributes!field;
                 }
             }
         }
-        return attrs;
+        return attributes;
     }
 }
 
-private template generateAttributeString(uint attributeMask)
+private template generateAttributeString(uint attributes)
 {
     enum string generateAttributeString()
     {
-        string attributes;
+        string attributesString;
 
-        static if (attributeMask & FunctionAttribute.nogc)
+        static if (attributes & FunctionAttribute.nogc)
         {
-            attributes ~= "@nogc ";
+            attributesString ~= "@nogc ";
         }
-        static if (attributeMask & FunctionAttribute.nothrow_)
+        static if (attributes & FunctionAttribute.nothrow_)
         {
-            attributes ~= "nothrow ";
+            attributesString ~= "nothrow ";
         }
-        static if (attributeMask & FunctionAttribute.pure_)
+        static if (attributes & FunctionAttribute.pure_)
         {
-            attributes ~= "pure ";
+            attributesString ~= "pure ";
         }
-        static if (attributeMask & FunctionAttribute.safe)
+        static if (attributes & FunctionAttribute.safe)
         {
-            attributes ~= "@safe ";
+            attributesString ~= "@safe ";
         }
 
-        return attributes;
+        return attributesString;
     }
 }
 
@@ -859,13 +857,13 @@ nothrow pure @safe unittest
     class A
     {
         @Read
-        S[] foo1_;
+        S[] foo_;
 
         @ConstRead
-        S foo2_;
+        S bar_;
 
         @Write
-        S foo3_;
+        S baz_;
 
         mixin(GenerateFieldAccessors);
     }
