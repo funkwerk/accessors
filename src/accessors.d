@@ -41,7 +41,8 @@ mixin template GenerateFieldAccessorMethods()
 
         foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
         {
-            alias field = Alias!(__traits(getMember, typeof(this), name));
+            enum field_str = "Alias!(__traits(getMember, typeof(this), \""~name~"\"))";
+            mixin("alias field = "~field_str~";");
 
             static if (__traits(compiles, hasUDA!(field, Read)))
             {
@@ -68,7 +69,7 @@ mixin template GenerateFieldAccessorMethods()
 
                 static if (hasUDA!(field, Write))
                 {
-                    enum string writerDecl = GenerateWriter!(name, field);
+                    enum string writerDecl = GenerateWriter!(name, field, field_str);
                     debug (accessors) pragma(msg, writerDecl);
                     result ~= writerDecl;
                 }
@@ -189,7 +190,7 @@ template GenerateConstReader(string name, alias field)
     }
 }
 
-template GenerateWriter(string name, alias field)
+template GenerateWriter(string name, alias field, string field_str)
 {
     enum GenerateWriter = helper;
 
@@ -199,7 +200,6 @@ template GenerateWriter(string name, alias field)
 
         enum visibility = getVisibility!(field, Write);
         enum accessorName = accessor(name);
-        enum inputType = typeName!(typeof(field));
         enum inputName = accessorName;
         enum needToDup = needToDup!field;
 
@@ -221,8 +221,8 @@ template GenerateWriter(string name, alias field)
 
         enum attributesString = generateAttributeString!attributes;
 
-        return format("%s final @property void %s(%s %s) %s{ this.%s = %s%s; }",
-            visibility, accessorName, inputType, inputName,
+        return format("%s final @property void %s(typeof(%s) %s) %s{ this.%s = %s%s; }",
+            visibility, accessorName, field_str, inputName,
             attributesString, name, inputName, needToDup ? ".dup" : "");
     }
 }
@@ -234,14 +234,14 @@ template GenerateWriter(string name, alias field)
     string stringValue;
     int[] intArrayValue;
 
-    static assert(GenerateWriter!("foo", integerValue) ==
-        "public final @property void foo(int foo) " ~
+    static assert(GenerateWriter!("foo", integerValue, "integerValue") ==
+        "public final @property void foo(typeof(integerValue) foo) " ~
         "@nogc nothrow pure @safe { this.foo = foo; }");
-    static assert(GenerateWriter!("foo", stringValue) ==
-        "public final @property void foo(string foo) " ~
+    static assert(GenerateWriter!("foo", stringValue, "stringValue") ==
+        "public final @property void foo(typeof(stringValue) foo) " ~
         "@nogc nothrow pure @safe { this.foo = foo; }");
-    static assert(GenerateWriter!("foo", intArrayValue) ==
-        "public final @property void foo(int[] foo) " ~
+    static assert(GenerateWriter!("foo", intArrayValue, "intArrayValue") ==
+        "public final @property void foo(typeof(intArrayValue) foo) " ~
         "nothrow pure @safe { this.foo = foo.dup; }");
 }
 
@@ -331,89 +331,6 @@ private template generateAttributeString(uint attributes)
 
         return attributesString;
     }
-}
-
-/**
- * This template returns the name of a type used in attribute readers and writers.
- * While it should be safe to use fullyQualifiedName everywhere, this does not work for
- * types defined in methods. Unfortunately it is required to use it for Flags.
- * Flags seem to be somehow special here.
- */
-private template typeName(T)
-{
-    enum typeName = helper;
-
-    static enum helper()
-    {
-        import std.array : replaceLast;
-
-        static if (T.stringof == "Flag" || T.stringof == "const(Flag)")
-        {
-            return fullyQualifiedName!T["std.typecons.".length .. $];
-        }
-        else static if (__traits(compiles, __traits(identifier, T)) && __traits(identifier, T) == "BitFlags")
-        {
-            return T.stringof.replaceLast("(Flag)", `(Flag!"unsafe")`);
-        }
-        else static if (__traits(compiles, localTypeName!T))
-        {
-            return localTypeName!T;
-        }
-        else
-        {
-            return T.stringof;
-        }
-    }
-}
-
-@nogc nothrow pure @safe unittest
-{
-    import std.typecons : Flag, BitFlags, Yes, No;
-
-    enum E
-    {
-        A = 0,
-        B = 2,
-    }
-
-    static assert(typeName!int == "int");
-    static assert(typeName!string == "string");
-    static assert(typeName!(BitFlags!E) == `BitFlags!(E, cast(Flag!"unsafe")false)`);
-    static assert(typeName!(BitFlags!(E, Yes.unsafe)) == `BitFlags!(E, cast(Flag!"unsafe")true)`);
-    static assert(typeName!(Flag!"foo") == `Flag!("foo")`);
-}
-
-private template localTypeName(T)
-{
-    enum localTypeName = helper;
-
-    static enum helper()
-    {
-        import std.algorithm : find, startsWith;
-        import std.array : replaceLast;
-
-        alias fullyQualifiedTypeName = fullyQualifiedName!(Unqual!T);
-        string typeName = fullyQualifiedTypeName[moduleName!T.length + 1 .. $];
-
-        // classes defined in unittest blocks have a prefix like __unittestL526_18
-        version (unittest)
-        {
-            if (typeName.startsWith("__unittestL"))
-            {
-                typeName = typeName.find(".")[1 .. $];
-            }
-        }
-        return fullyQualifiedName!T.replaceLast(fullyQualifiedTypeName, typeName);
-    }
-}
-
-@nogc nothrow pure @safe unittest
-{
-    class C
-    {
-    }
-
-    static assert(localTypeName!C == "C");
 }
 
 private template needToDup(alias field)
