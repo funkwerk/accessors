@@ -41,8 +41,8 @@ mixin template GenerateFieldAccessorMethods()
 
         foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
         {
-            enum field_str = "Alias!(__traits(getMember, typeof(this), \""~name~"\"))";
-            mixin("alias field = "~field_str~";");
+            enum string fieldString = `Alias!(__traits(getMember, typeof(this), "` ~ name ~ `"))`;
+            mixin("alias field = " ~ fieldString ~ ";");
 
             static if (__traits(compiles, hasUDA!(field, Read)))
             {
@@ -69,7 +69,7 @@ mixin template GenerateFieldAccessorMethods()
 
                 static if (hasUDA!(field, Write))
                 {
-                    enum string writerDecl = GenerateWriter!(name, field, field_str);
+                    enum string writerDecl = GenerateWriter!(name, field, fieldString);
                     debug (accessors) pragma(msg, writerDecl);
                     result ~= writerDecl;
                 }
