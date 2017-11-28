@@ -282,9 +282,13 @@ unittest
 {
     class C
     {
+        @Read
+        static int stuff_ = 8;
+
+        mixin(GenerateFieldAccessors);
     }
 
-    static assert(localTypeName!C == "C");
+    assert(C.stuff == 8);
 }
 
 private template needToDup(alias field)
@@ -733,4 +737,22 @@ unittest
     {
         Field[] arr = foo;
     }
+}
+
+/// Static properties are generated for static members.
+unittest
+{
+    struct S
+    {
+        @Read @Write
+        static int foo_ = 8;
+
+        @ConstRead
+        static int bar_ = 7;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    assert(S.foo == 8);
+    assert(S.bar == 7);
 }
