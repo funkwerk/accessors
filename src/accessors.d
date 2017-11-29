@@ -41,8 +41,8 @@ mixin template GenerateFieldAccessorMethods()
 
         foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
         {
-            enum string fieldString = `Alias!(__traits(getMember, typeof(this), "` ~ name ~ `"))`;
-            mixin("alias field = " ~ fieldString ~ ";");
+            enum string fieldCode = `Alias!(__traits(getMember, typeof(this), "` ~ name ~ `"))`;
+            mixin("alias field = " ~ fieldCode ~ ";");
 
             static if (__traits(compiles, hasUDA!(field, Read)))
             {
@@ -69,7 +69,7 @@ mixin template GenerateFieldAccessorMethods()
 
                 static if (hasUDA!(field, Write))
                 {
-                    enum string writerDecl = GenerateWriter!(name, field, fieldString);
+                    enum string writerDecl = GenerateWriter!(name, field, fieldCode);
                     debug (accessors) pragma(msg, writerDecl);
                     result ~= writerDecl;
                 }
@@ -190,7 +190,7 @@ template GenerateConstReader(string name, alias field)
     }
 }
 
-template GenerateWriter(string name, alias field, string field_str)
+template GenerateWriter(string name, alias field, string fieldCode)
 {
     enum GenerateWriter = helper;
 
@@ -222,7 +222,7 @@ template GenerateWriter(string name, alias field, string field_str)
         enum attributesString = generateAttributeString!attributes;
 
         return format("%s final @property void %s(typeof(%s) %s) %s{ this.%s = %s%s; }",
-            visibility, accessorName, field_str, inputName,
+            visibility, accessorName, fieldCode, inputName,
             attributesString, name, inputName, needToDup ? ".dup" : "");
     }
 }
