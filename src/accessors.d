@@ -1,5 +1,7 @@
 module accessors;
 
+import std.traits;
+
 struct Read
 {
     string visibility = "public";
@@ -39,7 +41,8 @@ mixin template GenerateFieldAccessorMethods()
 
         foreach (name; Filter!(isNotThis, __traits(derivedMembers, typeof(this))))
         {
-            alias field = Alias!(__traits(getMember, typeof(this), name));
+            enum string fieldCode = `Alias!(__traits(getMember, typeof(this), "` ~ name ~ `"))`;
+            mixin("alias field = " ~ fieldCode ~ ";");
 
             static if (__traits(compiles, hasUDA!(field, Read)))
             {
@@ -66,7 +69,7 @@ mixin template GenerateFieldAccessorMethods()
 
                 static if (hasUDA!(field, Write))
                 {
-                    enum string writerDecl = GenerateWriter!(name, field);
+                    enum string writerDecl = GenerateWriter!(name, field, fieldCode);
                     debug (accessors) pragma(msg, writerDecl);
                     result ~= writerDecl;
                 }
@@ -111,46 +114,68 @@ template GenerateReader(string name, alias field)
     static enum helper()
     {
         import std.string : format;
-        import std.traits : isArray, isSomeString;
 
         enum visibility = getVisibility!(field, Read);
         enum accessorName = accessor(name);
+        enum needToDup = needToDup!field;
 
-        static if (isArray!(typeof(field)) && !isSomeString!(typeof(field)))
+        static if (needToDup && isStatic!field)
         {
-            return format("%s%s final @property auto %s() {"
-                        ~ "return [] ~ this.%s;"
-                        ~ "}",
-                          visibility, getModifiers!field, accessorName, name);
+            enum uint attributes = inferAttributes!(typeof(field[0]), "__postblit") &
+                ~FunctionAttribute.nogc & ~FunctionAttribute.pure_;
+        }
+        else static if (needToDup)
+        {
+            enum uint attributes = inferAttributes!(typeof(field[0]), "__postblit") &
+                ~FunctionAttribute.nogc;
         }
         else static if (isStatic!field)
         {
-           return format("%s static final @property auto %s() { return this.%s; }",
-                         visibility, accessorName, name);
+            enum uint attributes = inferAttributes!(typeof(field), "__postblit") &
+                ~FunctionAttribute.pure_;
         }
         else
         {
-           return format("%s final @property auto %s() inout { return this.%s; }",
-                         visibility, accessorName, name);
+            enum uint attributes = inferAttributes!(typeof(field), "__postblit");
+        }
+
+        string attributesString = generateAttributeString!attributes;
+
+        static if (needToDup)
+        {
+            return format("%s%s final @property auto %s() %s"
+                        ~ "{ return [] ~ this.%s; }",
+                          visibility, getModifiers!field, accessorName, attributesString, name);
+        }
+        else static if (isStatic!field)
+        {
+            return format("%s static final @property auto %s() %s{ return this.%s; }",
+                visibility, accessorName, attributesString, name);
+        }
+        else
+        {
+            return format("%s final @property auto %s() inout %s{ return this.%s; }",
+                visibility, accessorName, attributesString, name);
         }
     }
 }
 
 ///
-unittest
+@nogc nothrow pure @safe unittest
 {
     int integerValue;
     string stringValue;
     int[] intArrayValue;
 
     static assert(GenerateReader!("foo", integerValue) ==
-        "public static final @property auto foo() { return this.foo; }");
+        "public static final @property auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateReader!("foo", stringValue) ==
-        "public static final @property auto foo() { return this.foo; }");
+        "public static final @property auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public static final @property auto foo() {"
-      ~ "return [] ~ this.foo;"
-      ~ "}");
+        "public static final @property auto foo() nothrow @safe "
+      ~ "{ return [] ~ this.foo; }");
 }
 
 template GenerateRefReader(string name, alias field)
@@ -164,24 +189,37 @@ template GenerateRefReader(string name, alias field)
         enum visibility = getVisibility!(field, RefRead);
         enum accessorName = accessor(name);
 
-        return format("%s%s final @property ref auto %s() { return this.%s; }",
-                      visibility, getModifiers!field, accessorName, name);
+        static if (isStatic!field)
+        {
+            enum string attributesString = "@nogc nothrow @safe ";
+        }
+        else
+        {
+            enum string attributesString = "@nogc nothrow pure @safe ";
+        }
+
+        return format("%s%s final @property ref auto %s() " ~
+            "%s{ return this.%s; }",
+            visibility, getModifiers!field, accessorName, attributesString, name);
     }
 }
 
 ///
-unittest
+@nogc nothrow pure @safe unittest
 {
     int integerValue;
     string stringValue;
     int[] intArrayValue;
 
     static assert(GenerateRefReader!("foo", integerValue) ==
-        "public static final @property ref auto foo() { return this.foo; }");
+        "public static final @property ref auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateRefReader!("foo", stringValue) ==
-        "public static final @property ref auto foo() { return this.foo; }");
+        "public static final @property ref auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateRefReader!("foo", intArrayValue) ==
-        "public static final @property ref auto foo() { return this.foo; }");
+        "public static final @property ref auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
 }
 
 template GenerateConstReader(string name, alias field)
@@ -195,20 +233,15 @@ template GenerateConstReader(string name, alias field)
         enum visibility = getVisibility!(field, RefRead);
         enum accessorName = accessor(name);
 
-        static if (isStatic!field)
-        {
-            return format("static %s final @property auto %s() { return this.%s; }",
-                          visibility, accessorName, name);
-        }
-        else
-        {
-            return format("%s final @property auto %s() const { return this.%s; }",
-                          visibility, accessorName, name);
-        }
+        alias attributes = inferAttributes!(typeof(field), "__postblit");
+        string attributesString = generateAttributeString!attributes;
+
+        return format("%s final @property auto %s() const %s { return this.%s; }",
+            visibility, accessorName, attributesString, name);
     }
 }
 
-template GenerateWriter(string name, alias field)
+template GenerateWriter(string name, alias field, string fieldCode)
 {
     enum GenerateWriter = helper;
 
@@ -218,104 +251,153 @@ template GenerateWriter(string name, alias field)
 
         enum visibility = getVisibility!(field, Write);
         enum accessorName = accessor(name);
-        enum inputType = typeName!(typeof(field));
         enum inputName = accessorName;
-        enum needToDup = needToDup!field ? ".dup" : "";
+        enum needToDup = needToDup!field;
 
-        return format("%s%s final @property void %s(%s %s) { this.%s = %s%s; }",
-            visibility, getModifiers!field, accessorName, inputType,
-            inputName, name, inputName, needToDup);
+        static if (needToDup && isStatic!field)
+        {
+            enum uint attributes = defaultFunctionAttributes &
+                ~FunctionAttribute.nogc &
+                ~FunctionAttribute.pure_ &
+                inferAssignAttributes!(typeof(field[0])) &
+                inferAttributes!(typeof(field[0]), "__postblit") &
+                inferAttributes!(typeof(field[0]), "__dtor");
+        }
+        else static if (needToDup)
+        {
+            enum uint attributes = defaultFunctionAttributes &
+                ~FunctionAttribute.nogc &
+                inferAssignAttributes!(typeof(field[0])) &
+                inferAttributes!(typeof(field[0]), "__postblit") &
+                inferAttributes!(typeof(field[0]), "__dtor");
+        }
+        else static if (isStatic!field)
+        {
+            enum uint attributes = defaultFunctionAttributes &
+                ~FunctionAttribute.pure_ &
+                inferAssignAttributes!(typeof(field)) &
+                inferAttributes!(typeof(field), "__postblit") &
+                inferAttributes!(typeof(field), "__dtor");
+        }
+        else
+        {
+            enum uint attributes = defaultFunctionAttributes &
+                inferAssignAttributes!(typeof(field)) &
+                inferAttributes!(typeof(field), "__postblit") &
+                inferAttributes!(typeof(field), "__dtor");
+        }
+
+        enum attributesString = generateAttributeString!attributes;
+
+        return format("%s%s final @property void %s(typeof(%s) %s) %s{ this.%s = %s%s; }",
+            visibility, getModifiers!field, accessorName, fieldCode, inputName,
+            attributesString, name, inputName, needToDup ? ".dup" : "");
     }
 }
 
 ///
-unittest
+@nogc nothrow pure @safe unittest
 {
     int integerValue;
     string stringValue;
     int[] intArrayValue;
 
-    static assert(GenerateWriter!("foo", integerValue) ==
-        "public static final @property void foo(int foo) { this.foo = foo; }");
-    static assert(GenerateWriter!("foo", stringValue) ==
-        "public static final @property void foo(string foo) { this.foo = foo; }");
-    static assert(GenerateWriter!("foo", intArrayValue) ==
-        "public static final @property void foo(int[] foo) { this.foo = foo.dup; }");
+    static assert(GenerateWriter!("foo", integerValue, "integerValue") ==
+        "public static final @property void foo(typeof(integerValue) foo) " ~
+        "@nogc nothrow @safe { this.foo = foo; }");
+    static assert(GenerateWriter!("foo", stringValue, "stringValue") ==
+        "public static final @property void foo(typeof(stringValue) foo) " ~
+        "@nogc nothrow @safe { this.foo = foo; }");
+    static assert(GenerateWriter!("foo", intArrayValue, "intArrayValue") ==
+        "public static final @property void foo(typeof(intArrayValue) foo) " ~
+        "nothrow @safe { this.foo = foo.dup; }");
 }
 
-/**
- * This template returns the name of a type used in attribute readers and writers.
- * While it should be safe to use fullyQualifiedName everywhere, this does not work for
- * types defined in methods. Unfortunately it is required to use it for Flags.
- * Flags seem to be somehow special here.
- */
-private template typeName(T)
+private enum uint defaultFunctionAttributes =
+            FunctionAttribute.nogc |
+            FunctionAttribute.safe |
+            FunctionAttribute.nothrow_ |
+            FunctionAttribute.pure_;
+
+private template inferAttributes(T, string M)
 {
-    enum typeName = helper;
-
-    static enum helper()
+    enum uint inferAttributes()
     {
-        import std.array : replaceLast;
-        import std.traits : fullyQualifiedName;
+        uint attributes = defaultFunctionAttributes;
 
-        static if (T.stringof == "Flag" || T.stringof == "const(Flag)")
+        static if (is(T == struct))
         {
-            return fullyQualifiedName!T["std.typecons.".length .. $];
-        }
-        else static if (__traits(compiles, __traits(identifier, T)) && __traits(identifier, T) == "BitFlags")
-        {
-            return T.stringof.replaceLast("(Flag)", `(Flag!"unsafe")`);
-        }
-        else static if (__traits(compiles, localTypeName!T))
-        {
-            return localTypeName!T;
-        }
-        else
-        {
-            return T.stringof;
-        }
-    }
-}
-
-unittest
-{
-    import std.typecons : Flag, BitFlags, Yes, No;
-
-    enum E
-    {
-        A = 0,
-        B = 2,
-    }
-
-    static assert(typeName!int == "int");
-    static assert(typeName!string == "string");
-    static assert(typeName!(BitFlags!E) == `BitFlags!(E, cast(Flag!"unsafe")false)`);
-    static assert(typeName!(BitFlags!(E, Yes.unsafe)) == `BitFlags!(E, cast(Flag!"unsafe")true)`);
-    static assert(typeName!(Flag!"foo") == `Flag!("foo")`);
-}
-
-private template localTypeName(T)
-{
-    enum localTypeName = helper;
-
-    static enum helper()
-    {
-        import std.algorithm : find, startsWith;
-        import std.array : replaceLast;
-        import std.traits : fullyQualifiedName, moduleName, Unqual;
-
-        alias fullyQualifiedTypeName = fullyQualifiedName!(Unqual!T);
-        string typeName = fullyQualifiedTypeName[moduleName!T.length + 1 .. $];
-
-        // classes defined in unittest blocks have a prefix like __unittestL526_18
-        version (unittest)
-        {
-            if (typeName.startsWith("__unittestL"))
+            static if (hasMember!(T, M))
             {
-                typeName = typeName.find(".")[1 .. $];
+                attributes &= functionAttributes!(__traits(getMember, T, M));
+            }
+            else
+            {
+                foreach (field; Fields!T)
+                {
+                    attributes &= inferAttributes!(field, M);
+                }
             }
         }
-        return fullyQualifiedName!T.replaceLast(fullyQualifiedTypeName, typeName);
+        return attributes;
+    }
+}
+
+private template inferAssignAttributes(T)
+{
+    enum uint inferAssignAttributes()
+    {
+        uint attributes = defaultFunctionAttributes;
+
+        static if (is(T == struct))
+        {
+            static if (hasMember!(T, "opAssign"))
+            {
+                foreach (o; __traits(getOverloads, T, "opAssign"))
+                {
+                    alias params = Parameters!o;
+                    static if (params.length == 1 && is(params[0] == T))
+                    {
+                        attributes &= functionAttributes!o;
+                    }
+                }
+            }
+            else
+            {
+                foreach (field; Fields!T)
+                {
+                    attributes &= inferAssignAttributes!field;
+                }
+            }
+        }
+        return attributes;
+    }
+}
+
+private template generateAttributeString(uint attributes)
+{
+    enum string generateAttributeString()
+    {
+        string attributesString;
+
+        static if (attributes & FunctionAttribute.nogc)
+        {
+            attributesString ~= "@nogc ";
+        }
+        static if (attributes & FunctionAttribute.nothrow_)
+        {
+            attributesString ~= "nothrow ";
+        }
+        static if (attributes & FunctionAttribute.pure_)
+        {
+            attributesString ~= "pure ";
+        }
+        static if (attributes & FunctionAttribute.safe)
+        {
+            attributesString ~= "@safe ";
+        }
+
+        return attributesString;
     }
 }
 
@@ -325,8 +407,6 @@ private template needToDup(alias field)
 
     static enum helper()
     {
-        import std.traits : isArray, isSomeString;
-
         static if (isSomeString!(typeof(field)))
         {
             return false;
@@ -338,7 +418,7 @@ private template needToDup(alias field)
     }
 }
 
-unittest
+@nogc nothrow pure @safe unittest
 {
     int integerField;
     int[] integerArrayField;
@@ -349,7 +429,7 @@ unittest
     static assert(!needToDup!stringField);
 }
 
-static string accessor(string name)
+static string accessor(string name) @nogc nothrow pure @safe
 {
     import std.string : chomp, chompPrefix;
 
@@ -357,7 +437,7 @@ static string accessor(string name)
 }
 
 ///
-unittest
+@nogc nothrow pure @safe unittest
 {
     assert(accessor("foo_") == "foo");
     assert(accessor("_foo") == "foo");
@@ -369,7 +449,6 @@ unittest
  */
 template getVisibility(alias field, A)
 {
-    import std.traits : getUDAs;
     import std.string : format;
 
     enum getVisibility = helper;
@@ -396,7 +475,7 @@ template getVisibility(alias field, A)
 }
 
 ///
-unittest
+@nogc nothrow pure @safe unittest
 {
     @Read("public") int publicInt;
     @Read("package") int packageInt;
@@ -415,7 +494,7 @@ unittest
 }
 
 /// Creates accessors for flags.
-unittest
+nothrow pure @safe unittest
 {
     import std.typecons : Flag, No, Yes;
 
@@ -441,7 +520,7 @@ unittest
 }
 
 /// Creates accessors for Nullables.
-unittest
+nothrow pure @safe unittest
 {
     import std.typecons : Nullable;
 
@@ -463,7 +542,7 @@ unittest
 }
 
 /// Creates non-const reader.
-unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -485,7 +564,7 @@ unittest
 }
 
 /// Creates ref reader.
-unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -504,7 +583,7 @@ unittest
 }
 
 /// Creates writer.
-unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -523,7 +602,7 @@ unittest
 }
 
 /// Checks whether hasUDA can be used for each member.
-unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -543,7 +622,7 @@ unittest
 }
 
 /// Returns non const for PODs and structs.
-unittest
+nothrow pure @safe unittest
 {
     import std.algorithm : map, sort;
     import std.array : array;
@@ -562,7 +641,7 @@ unittest
 }
 
 /// Regression.
-unittest
+nothrow pure @safe unittest
 {
     class C
     {
@@ -581,7 +660,7 @@ unittest
 }
 
 /// Supports user-defined accessors.
-unittest
+nothrow pure @safe unittest
 {
     class C
     {
@@ -608,7 +687,7 @@ unittest
 }
 
 /// Creates accessor for locally defined types.
-unittest
+@system unittest
 {
     class X
     {
@@ -632,7 +711,7 @@ unittest
 }
 
 /// Creates const reader for simple structs.
-unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -659,7 +738,7 @@ unittest
 }
 
 /// Reader for structs return copies.
-unittest
+nothrow pure @safe unittest
 {
     class Test
     {
@@ -682,7 +761,7 @@ unittest
 }
 
 /// Creates reader for const arrays.
-unittest
+nothrow pure @safe unittest
 {
     class X
     {
@@ -710,7 +789,7 @@ unittest
 }
 
 /// Property has correct type.
-unittest
+nothrow pure @safe unittest
 {
     class C
     {
@@ -726,8 +805,8 @@ unittest
     }
 }
 
-/// Inheritance (https://github.com/funkwerk/accessors/issues/5)
-unittest
+/// Inheritance (https://github.com/funkwerk/accessors/issues/5).
+@nogc nothrow pure @safe unittest
 {
     class A
     {
@@ -746,8 +825,37 @@ unittest
     }
 }
 
+/// Transfers struct attributes.
+@nogc nothrow pure @safe unittest
+{
+    struct S
+    {
+        this(this)
+        {
+        }
+
+        void opAssign(S s)
+        {
+        }
+    }
+
+    class A
+    {
+        @Read
+        S[] foo_;
+
+        @ConstRead
+        S bar_;
+
+        @Write
+        S baz_;
+
+        mixin(GenerateFieldAccessors);
+    }
+}
+
 /// @Read property returns array with mutable elements.
-unittest
+nothrow pure @safe unittest
 {
     struct Field
     {
@@ -788,17 +896,13 @@ unittest
         @Read @Write
         static int foo_ = 8;
 
-        @ConstRead
-        static int bar_ = 7;
-
         @RefRead
-        static int baz_ = 6;
+        static int bar_ = 6;
 
         mixin(GenerateFieldAccessors);
     }
 
     assert(S.foo == 8);
     static assert(is(typeof({ S.foo = 8; })));
-    assert(S.bar == 7);
-    assert(S.baz == 6);
+    assert(S.bar == 6);
 }
