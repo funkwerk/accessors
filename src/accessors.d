@@ -7,6 +7,10 @@ struct Read
     string visibility = "public";
 }
 
+// Deprecated! See below.
+// RefRead can not check invariants on change, so there's no point.
+// ref property functions where the value being returned is a field of the class
+// are entirely equivalent to public fields.
 struct RefRead
 {
     string visibility = "public";
@@ -55,6 +59,9 @@ mixin template GenerateFieldAccessorMethods()
 
                 static if (hasUDA!(field, RefRead))
                 {
+                    result ~= "pragma(msg, \"Deprecation! RefRead on " ~ typeof(this).stringof ~ "." ~ name
+                        ~ " makes a private field effectively public, defeating the point.\");";
+
                     enum string refReaderDecl = GenerateRefReader!(name, field);
                     debug (accessors) pragma(msg, refReaderDecl);
                     result ~= refReaderDecl;
