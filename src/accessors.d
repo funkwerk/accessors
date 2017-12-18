@@ -59,8 +59,8 @@ mixin template GenerateFieldAccessorMethods()
 
                 static if (hasUDA!(field, RefRead))
                 {
-                    result ~= "pragma(msg, \"Deprecation! RefRead on " ~ typeof(this).stringof ~ "." ~ name
-                        ~ " makes a private field effectively public, defeating the point.\");";
+                    result ~= `pragma(msg, "Deprecation! RefRead on ` ~ typeof(this).stringof ~ `.` ~ name
+                        ~ ` makes a private field effectively public, defeating the point.");`;
 
                     enum string refReaderDecl = GenerateRefReader!(name, field);
                     debug (accessors) pragma(msg, refReaderDecl);
