@@ -114,6 +114,25 @@ template getModifiers(alias field)
     }
 }
 
+template filterAttributes(alias field)
+{
+    enum filterAttributes = helper;
+
+    static enum helper()
+    {
+        uint attributes = uint.max;
+        static if (needToDup!field)
+        {
+            attributes &= ~FunctionAttribute.nogc;
+        }
+        static if (isStatic!field)
+        {
+            attributes &= ~FunctionAttribute.pure_;
+        }
+        return attributes;
+    }
+}
+
 template GenerateReader(string name, alias field)
 {
     enum GenerateReader = helper;
@@ -126,25 +145,8 @@ template GenerateReader(string name, alias field)
         enum accessorName = accessor(name);
         enum needToDup = needToDup!field;
 
-        static if (needToDup && isStatic!field)
-        {
-            enum uint attributes = inferAttributes!(typeof(field[0]), "__postblit") &
-                ~FunctionAttribute.nogc & ~FunctionAttribute.pure_;
-        }
-        else static if (needToDup)
-        {
-            enum uint attributes = inferAttributes!(typeof(field[0]), "__postblit") &
-                ~FunctionAttribute.nogc;
-        }
-        else static if (isStatic!field)
-        {
-            enum uint attributes = inferAttributes!(typeof(field), "__postblit") &
-                ~FunctionAttribute.pure_;
-        }
-        else
-        {
-            enum uint attributes = inferAttributes!(typeof(field), "__postblit");
-        }
+        enum uint attributes = inferAttributes!(typeof(field), "__postblit") &
+            filterAttributes!field;
 
         string attributesString = generateAttributeString!attributes;
 
@@ -261,38 +263,11 @@ template GenerateWriter(string name, alias field, string fieldCode)
         enum inputName = accessorName;
         enum needToDup = needToDup!field;
 
-        static if (needToDup && isStatic!field)
-        {
-            enum uint attributes = defaultFunctionAttributes &
-                ~FunctionAttribute.nogc &
-                ~FunctionAttribute.pure_ &
-                inferAssignAttributes!(typeof(field[0])) &
-                inferAttributes!(typeof(field[0]), "__postblit") &
-                inferAttributes!(typeof(field[0]), "__dtor");
-        }
-        else static if (needToDup)
-        {
-            enum uint attributes = defaultFunctionAttributes &
-                ~FunctionAttribute.nogc &
-                inferAssignAttributes!(typeof(field[0])) &
-                inferAttributes!(typeof(field[0]), "__postblit") &
-                inferAttributes!(typeof(field[0]), "__dtor");
-        }
-        else static if (isStatic!field)
-        {
-            enum uint attributes = defaultFunctionAttributes &
-                ~FunctionAttribute.pure_ &
-                inferAssignAttributes!(typeof(field)) &
-                inferAttributes!(typeof(field), "__postblit") &
-                inferAttributes!(typeof(field), "__dtor");
-        }
-        else
-        {
-            enum uint attributes = defaultFunctionAttributes &
-                inferAssignAttributes!(typeof(field)) &
-                inferAttributes!(typeof(field), "__postblit") &
-                inferAttributes!(typeof(field), "__dtor");
-        }
+        enum uint attributes = defaultFunctionAttributes &
+            filterAttributes!field &
+            inferAssignAttributes!(typeof(field)) &
+            inferAttributes!(typeof(field), "__postblit") &
+            inferAttributes!(typeof(field), "__dtor");
 
         enum attributesString = generateAttributeString!attributes;
 
