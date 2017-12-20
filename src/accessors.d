@@ -87,6 +87,52 @@ mixin template GenerateFieldAccessorMethods()
     }
 }
 
+template isStatic(alias field)
+{
+    enum isStatic = helper;
+
+    static enum helper()
+    {
+        return is(typeof({ auto f = field; }));
+    }
+}
+
+template getModifiers(alias field)
+{
+    enum getModifiers = helper;
+
+    static enum helper()
+    {
+        static if (isStatic!field)
+        {
+            return " static";
+        }
+        else
+        {
+            return "";
+        }
+    }
+}
+
+template filterAttributes(alias field)
+{
+    enum filterAttributes = helper;
+
+    static enum helper()
+    {
+        uint attributes = uint.max;
+        static if (needToDup!field)
+        {
+            attributes &= ~FunctionAttribute.nogc;
+        }
+        static if (isStatic!field)
+        {
+            attributes &= ~FunctionAttribute.pure_;
+        }
+        return attributes;
+    }
+}
+
 template GenerateReader(string name, alias field)
 {
     enum GenerateReader = helper;
@@ -99,23 +145,21 @@ template GenerateReader(string name, alias field)
         enum accessorName = accessor(name);
         enum needToDup = needToDup!field;
 
-        static if (needToDup)
-        {
-            enum uint attributes = inferAttributes!(typeof(field[0]), "__postblit") &
-                ~FunctionAttribute.nogc;
-        }
-        else
-        {
-            enum uint attributes = inferAttributes!(typeof(field), "__postblit");
-        }
+        enum uint attributes = inferAttributes!(typeof(field), "__postblit") &
+            filterAttributes!field;
 
         string attributesString = generateAttributeString!attributes;
 
         static if (needToDup)
         {
-            return format("%s final @property auto %s() %s"
+            return format("%s%s final @property auto %s() %s"
                         ~ "{ return [] ~ this.%s; }",
-                          visibility, accessorName, attributesString, name);
+                          visibility, getModifiers!field, accessorName, attributesString, name);
+        }
+        else static if (isStatic!field)
+        {
+            return format("%s static final @property auto %s() %s{ return this.%s; }",
+                visibility, accessorName, attributesString, name);
         }
         else
         {
@@ -133,13 +177,13 @@ template GenerateReader(string name, alias field)
     int[] intArrayValue;
 
     static assert(GenerateReader!("foo", integerValue) ==
-        "public final @property auto foo() " ~
-        "inout @nogc nothrow pure @safe { return this.foo; }");
+        "public static final @property auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateReader!("foo", stringValue) ==
-        "public final @property auto foo() " ~
-        "inout @nogc nothrow pure @safe { return this.foo; }");
+        "public static final @property auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
-        "public final @property auto foo() nothrow pure @safe "
+        "public static final @property auto foo() nothrow @safe "
       ~ "{ return [] ~ this.foo; }");
 }
 
@@ -154,9 +198,18 @@ template GenerateRefReader(string name, alias field)
         enum visibility = getVisibility!(field, RefRead);
         enum accessorName = accessor(name);
 
-        return format("%s final @property ref auto %s() " ~
-            "@nogc nothrow pure @safe { return this.%s; }",
-            visibility, accessorName, name);
+        static if (isStatic!field)
+        {
+            enum string attributesString = "@nogc nothrow @safe ";
+        }
+        else
+        {
+            enum string attributesString = "@nogc nothrow pure @safe ";
+        }
+
+        return format("%s%s final @property ref auto %s() " ~
+            "%s{ return this.%s; }",
+            visibility, getModifiers!field, accessorName, attributesString, name);
     }
 }
 
@@ -168,14 +221,14 @@ template GenerateRefReader(string name, alias field)
     int[] intArrayValue;
 
     static assert(GenerateRefReader!("foo", integerValue) ==
-        "public final @property ref auto foo() " ~
-        "@nogc nothrow pure @safe { return this.foo; }");
+        "public static final @property ref auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateRefReader!("foo", stringValue) ==
-        "public final @property ref auto foo() " ~
-        "@nogc nothrow pure @safe { return this.foo; }");
+        "public static final @property ref auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateRefReader!("foo", intArrayValue) ==
-        "public final @property ref auto foo() " ~
-        "@nogc nothrow pure @safe { return this.foo; }");
+        "public static final @property ref auto foo() " ~
+        "@nogc nothrow @safe { return this.foo; }");
 }
 
 template GenerateConstReader(string name, alias field)
@@ -210,26 +263,16 @@ template GenerateWriter(string name, alias field, string fieldCode)
         enum inputName = accessorName;
         enum needToDup = needToDup!field;
 
-        static if (needToDup)
-        {
-            enum attributes = defaultFunctionAttributes &
-                ~FunctionAttribute.nogc &
-                inferAssignAttributes!(typeof(field[0])) &
-                inferAttributes!(typeof(field[0]), "__postblit") &
-                inferAttributes!(typeof(field[0]), "__dtor");
-        }
-        else
-        {
-            enum attributes = defaultFunctionAttributes &
-                inferAssignAttributes!(typeof(field)) &
-                inferAttributes!(typeof(field), "__postblit") &
-                inferAttributes!(typeof(field), "__dtor");
-        }
+        enum uint attributes = defaultFunctionAttributes &
+            filterAttributes!field &
+            inferAssignAttributes!(typeof(field)) &
+            inferAttributes!(typeof(field), "__postblit") &
+            inferAttributes!(typeof(field), "__dtor");
 
         enum attributesString = generateAttributeString!attributes;
 
-        return format("%s final @property void %s(typeof(%s) %s) %s{ this.%s = %s%s; }",
-            visibility, accessorName, fieldCode, inputName,
+        return format("%s%s final @property void %s(typeof(%s) %s) %s{ this.%s = %s%s; }",
+            visibility, getModifiers!field, accessorName, fieldCode, inputName,
             attributesString, name, inputName, needToDup ? ".dup" : "");
     }
 }
@@ -242,14 +285,14 @@ template GenerateWriter(string name, alias field, string fieldCode)
     int[] intArrayValue;
 
     static assert(GenerateWriter!("foo", integerValue, "integerValue") ==
-        "public final @property void foo(typeof(integerValue) foo) " ~
-        "@nogc nothrow pure @safe { this.foo = foo; }");
+        "public static final @property void foo(typeof(integerValue) foo) " ~
+        "@nogc nothrow @safe { this.foo = foo; }");
     static assert(GenerateWriter!("foo", stringValue, "stringValue") ==
-        "public final @property void foo(typeof(stringValue) foo) " ~
-        "@nogc nothrow pure @safe { this.foo = foo; }");
+        "public static final @property void foo(typeof(stringValue) foo) " ~
+        "@nogc nothrow @safe { this.foo = foo; }");
     static assert(GenerateWriter!("foo", intArrayValue, "intArrayValue") ==
-        "public final @property void foo(typeof(intArrayValue) foo) " ~
-        "nothrow pure @safe { this.foo = foo.dup; }");
+        "public static final @property void foo(typeof(intArrayValue) foo) " ~
+        "nothrow @safe { this.foo = foo.dup; }");
 }
 
 private enum uint defaultFunctionAttributes =
@@ -812,4 +855,36 @@ nothrow pure @safe unittest
     {
         Field[] arr = foo;
     }
+}
+
+/// Static properties are generated for static members.
+unittest
+{
+    class MyStaticTest
+    {
+        @Read
+        static int stuff_ = 8;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    assert(MyStaticTest.stuff == 8);
+}
+
+unittest
+{
+    struct S
+    {
+        @Read @Write
+        static int foo_ = 8;
+
+        @RefRead
+        static int bar_ = 6;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    assert(S.foo == 8);
+    static assert(is(typeof({ S.foo = 8; })));
+    assert(S.bar == 6);
 }
