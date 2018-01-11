@@ -24,12 +24,12 @@ class WithAccessors
 `@Read` and `@Write` generate the following two methods:
 
 ```d
-public final @property inout(int) num() inout
+public final @property auto num() inout @nogc nothrow pure @safe
 {
     return this.num_;
 }
 
-public final @property void num(int num)
+public final @property void num(int num) @nogc nothrow pure @safe
 {
     this.num_ = num;
 }
@@ -41,14 +41,12 @@ removing an underscore from the beginning or the end of the variable name.
 ### Available user defined attributes
 
 * `@Read`
-* `@RefRead`
 * `@ConstRead`
 * `@Write`
 
 As you can see there are multiple attributes that can be used to generate
 getters and only one for the setters. The getters differ by the return
-type. `@RefRead` returns a `ref` to the member variable, `@ConstRead`
-returns a `const` value.
+type. `@Read` returns an `inout` value, `@ConstRead` - a `const` value.
 
 ### Accessor visibility
 
