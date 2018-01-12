@@ -889,7 +889,7 @@ unittest
     assert(S.bar == 6);
 }
 
-unittest
+@nogc nothrow pure @safe unittest
 {
     struct Thing
     {
@@ -912,7 +912,7 @@ unittest
     }
 }
 
-unittest
+nothrow pure @safe unittest
 {
     class Class
     {
