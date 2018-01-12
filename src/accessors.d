@@ -153,8 +153,8 @@ template GenerateReader(string name, alias field)
         static if (needToDup)
         {
             return format("%s%s final @property auto %s() inout %s"
-                        ~ "{ return null ~ this.%s; }",
-                          visibility, getModifiers!field, accessorName, attributesString, name);
+                        ~ "{ return typeof(this.%s).init ~ this.%s; }",
+                          visibility, getModifiers!field, accessorName, attributesString, name, name);
         }
         else static if (isStatic!field)
         {
@@ -184,7 +184,7 @@ template GenerateReader(string name, alias field)
         "@nogc nothrow @safe { return this.foo; }");
     static assert(GenerateReader!("foo", intArrayValue) ==
         "public static final @property auto foo() inout nothrow @safe "
-      ~ "{ return null ~ this.foo; }");
+      ~ "{ return typeof(this.foo).init ~ this.foo; }");
 }
 
 template GenerateRefReader(string name, alias field)
@@ -910,4 +910,22 @@ unittest
             helper(thing.content);
         }
     }
+}
+
+unittest
+{
+    class Class
+    {
+    }
+
+    struct Thing
+    {
+        @Read
+        private Class[] classes_;
+
+        mixin(GenerateFieldAccessors);
+    }
+
+    Thing thing;
+    assert(thing.classes.length == 0);
 }
