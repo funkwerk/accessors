@@ -325,35 +325,41 @@ private template inferAttributes(T, string M)
     }
 }
 
-private template inferAssignAttributes(T)
+private enum uint inferAssignAttributes(T)()
 {
-    enum uint inferAssignAttributes()
+    static if (hasElaborateAssign!T)
     {
-        uint attributes = defaultFunctionAttributes;
-
-        static if (is(T == struct))
+        void testAttributes()()
         {
-            static if (hasMember!(T, "opAssign"))
-            {
-                foreach (o; __traits(getOverloads, T, "opAssign"))
-                {
-                    alias params = Parameters!o;
-                    static if (params.length == 1 && is(params[0] == T))
-                    {
-                        attributes &= functionAttributes!o;
-                    }
-                }
-            }
-            else
-            {
-                foreach (field; Fields!T)
-                {
-                    attributes &= inferAssignAttributes!field;
-                }
-            }
+            auto testObject = T.init;
+            testObject = T.init;
         }
-        return attributes;
+        return functionAttributes!(testAttributes!());
     }
+    else
+    {
+        return defaultFunctionAttributes;
+    }
+}
+
+// Issue 22: https://github.com/funkwerk/accessors/issues/22
+@nogc nothrow pure @safe unittest
+{
+    static struct SysTime
+    {
+        void opAssign(SysTime) @safe pure nothrow
+        {
+            new int;
+        }
+    }
+    static struct Nullable
+    {
+        SysTime t;
+        void opAssign()(SysTime)
+        {
+        }
+    }
+    static assert((inferAssignAttributes!Nullable & FunctionAttribute.nogc) == 0);
 }
 
 private template generateAttributeString(uint attributes)
