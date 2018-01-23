@@ -121,7 +121,7 @@ template filterAttributes(alias field)
     static enum helper()
     {
         uint attributes = uint.max;
-        static if (needToDup!field)
+        static if (needToDup!(typeof(field)))
         {
             attributes &= ~FunctionAttribute.nogc;
         }
@@ -143,7 +143,7 @@ template GenerateReader(string name, alias field)
 
         enum visibility = getVisibility!(field, Read);
         enum accessorName = accessor(name);
-        enum needToDup = needToDup!field;
+        enum needToDup = needToDup!(typeof(field));
 
         enum uint attributes = inferAttributes!(typeof(field), "__postblit") &
             filterAttributes!field;
@@ -261,7 +261,7 @@ template GenerateWriter(string name, alias field, string fieldCode)
         enum visibility = getVisibility!(field, Write);
         enum accessorName = accessor(name);
         enum inputName = accessorName;
-        enum needToDup = needToDup!field;
+        enum needToDup = needToDup!(typeof(field));
 
         enum uint attributes = defaultFunctionAttributes &
             filterAttributes!field &
@@ -389,32 +389,21 @@ private template generateAttributeString(uint attributes)
     }
 }
 
-private template needToDup(alias field)
-{
-    enum needToDup = helper;
+private enum needToDup(T) = isArray!T && !DeepConst!T;
 
-    static enum helper()
-    {
-        static if (isSomeString!(typeof(field)))
-        {
-            return false;
-        }
-        else
-        {
-            return isArray!(typeof(field));
-        }
-    }
-}
+private enum DeepConst(T) = __traits(compiles, (const T x) { T y = x; });
 
 @nogc nothrow pure @safe unittest
 {
     int integerField;
     int[] integerArrayField;
     string stringField;
+    const int[] constIntegerArrayField;
 
-    static assert(!needToDup!integerField);
-    static assert(needToDup!integerArrayField);
-    static assert(!needToDup!stringField);
+    static assert(!needToDup!(typeof(integerField)));
+    static assert(needToDup!(typeof(integerArrayField)));
+    static assert(!needToDup!(typeof(stringField)));
+    static assert(!needToDup!(typeof(constIntegerArrayField)));
 }
 
 static string accessor(string name) @nogc nothrow pure @safe
