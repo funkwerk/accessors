@@ -7,6 +7,8 @@
 
 `accessors` module allows to generate getters and setters automatically.
 
+**Deprecation warning:** `accessors` has been succeeded by [boilerplate](https://github.com/funkwerk/boilerplate).
+
 ## Usage
 
 ```d
